@@ -1,0 +1,31 @@
+# ---------------------------------------------------------------------------
+# CREDENZIALI - non deve mai finire nel repository
+# ---------------------------------------------------------------------------
+# Secrets.h contiene Client ID e Client Secret di Spotify di fabbrica.
+# Chi clona il progetto parte da Secrets.h.example e ci mette i propri.
+Secrets.h
+
+# ---------------------------------------------------------------------------
+# Artefatti di compilazione Arduino
+# ---------------------------------------------------------------------------
+build/
+*.bin
+*.elf
+*.map
+*.hex
+
+# ---------------------------------------------------------------------------
+# Ambiente locale
+# ---------------------------------------------------------------------------
+.vscode/
+.agents/
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# ---------------------------------------------------------------------------
+# File del case 3D e documentazione locale (Python / OpenSCAD / SVG)
+# ---------------------------------------------------------------------------
+case/
+docs/
+

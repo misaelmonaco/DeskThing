@@ -1,0 +1,63 @@
+# ===========================================================================
+# CONFIGURAZIONE DI COMPILAZIONE DEL PROGETTO
+# ---------------------------------------------------------------------------
+# Serve a una cosa sola: lo schema di partizione. Con quello di default
+# (1,31 MB per l'applicazione) il firmware occupa il 98% e non ci sta piu'
+# niente; con min_spiffs (1,97 MB) scende al 65% e resta lo slot OTA.
+#
+# Misurato, non stimato:
+#   default      1.286.124 su 1.310.720   98%   OTA si   SPIFFS 1,5 MB
+#   min_spiffs   1.286.156 su 1.966.080   65%   OTA si   SPIFFS 190 KB
+#   huge_app     1.286.156 su 3.145.728   40%   OTA NO   SPIFFS 896 KB
+#
+# Il binario e' lo stesso nei tre casi: lo schema non cambia il codice, cambia
+# il contenitore. min_spiffs e' il compromesso giusto - 680 KB di margine sono
+# piu' di quanto possa servire, e lo slot OTA una volta tolto si rimette solo
+# riflashando le partizioni da USB.
+#
+# Il filesystem non lo usiamo: le credenziali WiFi e il token Spotify stanno
+# in NVS, che e' una partizione a se' e vive a 0x9000 in tutti gli schemi.
+# Per questo cambiare schema non fa perdere l'accoppiamento - a patto di
+# lasciare disattivato "Erase All Flash Before Sketch Upload".
+# ===========================================================================
+
+# Lo prende arduino-cli quando si compila senza passare --fqbn.
+#
+# ATTENZIONE: l'IDE di Arduino usa il proprio menu Strumenti e non legge questa
+# riga. Nell'IDE va impostato a mano, una volta:
+#   Strumenti -> Partition Scheme -> Minimal SPIFFS (1.9MB APP with OTA/190KB SPIFFS)
+default_fqbn: esp32:esp32:esp32:PartitionScheme=min_spiffs
+
+# ---------------------------------------------------------------------------
+# PROFILO RIPRODUCIBILE - inattivo di proposito
+# ---------------------------------------------------------------------------
+# Scommentando il blocco qui sotto e aggiungendo `default_profile: esp32`, la
+# compilazione usa core e librerie alle versioni fissate invece di quelle
+# installate sulla macchina. Il vantaggio e' che il firmware si ricompila
+# identico fra sei mesi o su un altro computer, senza rompersi perche' una
+# libreria si e' aggiornata da sola.
+#
+# Il prezzo: al primo utilizzo arduino-cli scarica queste versioni esatte in
+# una cartella del progetto, quindi serve la rete, e le librerie installate
+# globalmente vengono ignorate. Inoltre ogni aggiornamento voluto va scritto
+# anche qui. Da attivare quando il progetto e' fermo, non il giorno prima di
+# un flash.
+#
+# Versioni rilevate dalla compilazione del 3 ottobre 2026.
+#
+# profiles:
+#   esp32:
+#     notes: ESP32 Dev Module, partizioni min_spiffs
+#     fqbn: esp32:esp32:esp32:PartitionScheme=min_spiffs
+#     platforms:
+#       - platform: esp32:esp32 (3.3.12)
+#     libraries:
+#       - WiFiManager (2.0.17)
+#       - DHT sensor library (1.4.7)
+#       - Adafruit GFX Library (1.12.6)
+#       - Adafruit BusIO (1.17.4)
+#       - Adafruit ST7735 and ST7789 Library (1.11.0)
+#       - Adafruit Unified Sensor (1.1.15)
+#       - SpotifyEsp32 (5.0.1)
+#       - ArduinoJson (7.4.3)
+#       - TJpg_Decoder (1.1.0)
