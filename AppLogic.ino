@@ -360,6 +360,10 @@ void goToNextPage() {
     dhtState.lastReadMs = 0;
   }
 
+  if (currentPage == PAGE_GOVEE) {
+    govee.lastPollMs = 0;
+  }
+
   markDisplayDirty();
 }
 
@@ -465,6 +469,7 @@ void connectToWifi() {
   WiFiManager wifiManager;
 
   WiFi.mode(WIFI_STA);
+  WiFi.setHostname("DeskThing");
   WiFi.setAutoReconnect(true);
   wifiManager.setConfigPortalTimeout(WIFI_PORTAL_TIMEOUT_S);
 
@@ -506,6 +511,11 @@ void connectToWifi() {
     drawBootScreen("rete non raggiungibile", "riavvia il dispositivo per riprovare", false, 1.0f, "WIFI ASSENTE");
     return;
   }
+
+  // Disabilita il risparmio energetico (Modem-Sleep) della radio WiFi.
+  // Evita che la radio si spenga tra i beacon DTIM, azzerando le latenze elevate
+  // e i timeout durante gli handshake TLS (Spotify, Govee).
+  WiFi.setSleep(false);
 
   // Gli ottetti si leggono uno per uno: IPAddress::toString() costruirebbe
   // una String solo per essere concatenata a un'altra e buttata via.
@@ -712,7 +722,7 @@ void ensureSpotifyClient() {
 void describeSpotifyError(const response &res) {
   const char *hint;
   switch (res.status_code) {
-    case -1:  hint = "token rifiutato o rete"; break;
+    case -1:  hint = "timeout rete o RAM TLS"; break;
     case 400: hint = "richiesta non valida"; break;
     case 401: hint = "token scaduto o revocato"; break;
     case 403: hint = "utente non abilitato all'app"; break;
@@ -727,7 +737,9 @@ void describeSpotifyError(const response &res) {
   if (detail[0] == '\0') {
     detail = res.reply.is<const char *>() ? res.reply.as<const char *>() : "";
   }
-  Serial.printf("Spotify HTTP %d: %s\n", res.status_code, detail);
+  Serial.printf("Spotify HTTP %d: %s (heap: %u, blocco max: %u)\n",
+                res.status_code, detail,
+                (unsigned) ESP.getFreeHeap(), (unsigned) ESP.getMaxAllocHeap());
 }
 
 void updateSpotifyState() {
@@ -1052,14 +1064,27 @@ void refreshWifiForgetArming() {
 // e si rimette tutto in moto.
 void refreshNetworkLink() {
   static bool wasOnline = false;
+  static unsigned long lastReconnectMs = 0;
 
   bool online = (WiFi.status() == WL_CONNECTED);
+
+  // Se la rete e' caduta, ritenta la riconnessione ogni 10 secondi in background.
+  if (!online) {
+    unsigned long now = millis();
+    if (now - lastReconnectMs >= 10000UL) {
+      lastReconnectMs = now;
+      Serial.println("[wifi] Connessione assente: tentativo di riconnessione automatica...");
+      WiFi.reconnect();
+    }
+  }
+
   if (online == wasOnline) {
     return;
   }
   wasOnline = online;
 
   if (online) {
+    WiFi.setSleep(false);
     Serial.println("Rete tornata disponibile: risincronizzo NTP e player");
     initTimeClock();
     // Se il client e' gia' costruito non si tocca: updateSpotifyState()
@@ -1083,6 +1108,7 @@ void refreshPageData() {
   refreshDhtData();
   refreshWeatherData();
   refreshSpotifyData();
+  refreshGoveeData();
   refreshWifiForgetArming();
   refreshSpotifyUnlinkArming();
   reportButtonDiagnostics();
@@ -1272,6 +1298,49 @@ void handlePomodoroButtonPress(size_t index) {
       break;
     case 3:
       resetPomodoroTimer();
+      break;
+    default:
+      break;
+  }
+}
+
+void handleGoveeButtonPress(size_t index) {
+  if (index == 0) {
+    goToNextPage();
+    return;
+  }
+
+  if (!govee.apiKeyPresent || WiFi.status() != WL_CONNECTED) {
+    if (index == 2) {
+      initGovee();
+      govee.lastPollMs = 0;
+      markDisplayDirty();
+    }
+    return;
+  }
+
+  if (!govee.deviceFound) {
+    if (index == 2) {
+      goveeDiscoverDevice();
+      govee.lastPollMs = 0;
+      markDisplayDirty();
+    }
+    return;
+  }
+
+  switch (index) {
+    case 1:
+      goveeSetPower(!govee.powerOn);
+      break;
+    case 2:
+      if (govee.powerOn) {
+        goveeStepBrightness();
+      }
+      break;
+    case 3:
+      if (govee.powerOn) {
+        goveeNextPreset();
+      }
       break;
     default:
       break;

@@ -194,16 +194,18 @@ constexpr int16_t ART_SIZE      = ART_SOURCE_PX / ART_SCALE;
 // Il guardiano vero non e' questo: e' ART_TLS_MARGIN confrontato con
 // getMaxAllocHeap(), che e' cio' che impedisce di allocare mangiandosi lo
 // spazio contiguo che servira' all'handshake TLS.
-constexpr size_t ART_MAX_BYTES  = 16 * 1024;
+// Tetto alla dimensione del file JPEG per copertina 64x64 px (in genere 3-5 KB).
+// 10 KB lascia ampio margine e risparmia 6 KB di RAM contigua.
+constexpr size_t ART_MAX_BYTES  = 10 * 1024;
 
 // Margine da lasciare libero per l'handshake TLS. Prima di allocare si
 // controlla ESP.getMaxAllocHeap(), che e' il blocco contiguo piu' grande
 // disponibile: e' quello che conta, non l'heap totale.
-constexpr size_t ART_TLS_MARGIN = 40 * 1024;
+constexpr size_t ART_TLS_MARGIN = 36 * 1024;
 
 // Allocazione iniziale quando il server non manda Content-Length, e passo di
 // crescita della realloc.
-constexpr size_t ART_CHUNK      = 8 * 1024;
+constexpr size_t ART_CHUNK      = 4 * 1024;
 
 // Scadenza di inattivita' dello stream: si rimanda a ogni byte ricevuto, cosi'
 // un download lento non viene interrotto ma uno fermo si.
@@ -225,7 +227,7 @@ constexpr unsigned long POMODORO_BREAK_MS = 10UL * 60UL * 1000UL;
 // Non e' una rete a cui si collega: le credenziali della rete di casa non
 // stanno nel codice, le salva WiFiManager nella NVS dell'ESP32 dopo la prima
 // configurazione dal portale.
-constexpr const char *WIFI_PORTAL_SSID = "SpotifyThing-Setup";
+constexpr const char *WIFI_PORTAL_SSID = "Desk Thing";
 constexpr unsigned int WIFI_PORTAL_TIMEOUT_S = 180;
 
 // Cancellazione della rete salvata. Serve quando si cambia router o si sposta
@@ -320,6 +322,25 @@ constexpr unsigned long WEATHER_RETRY_MS   = 90UL * 1000;
 constexpr unsigned long WEATHER_STALE_MS = 60UL * 60 * 1000;
 
 constexpr uint16_t WEATHER_HTTP_TIMEOUT_MS = 6000;
+
+// ---------------------------------------------------------------------------
+// GOVEE OPENAPI v2
+// ---------------------------------------------------------------------------
+// Base URL e limiti per il controllo della striscia LED tramite Govee v2
+// OpenAPI (https://openapi.api.govee.com). La chiave viene letta da Secrets.h
+// (GOVEE_API_KEY); SKU, indirizzo MAC e nome del dispositivo vengono scoperti
+// automaticamente con GET /router/api/v1/user/devices e salvati in NVS.
+constexpr const char *GOVEE_BASE_URL      = "https://openapi.api.govee.com";
+constexpr const char *GOVEE_NVS_NAMESPACE = "govee";
+
+constexpr size_t GOVEE_KEY_MAX    = 64;
+constexpr size_t GOVEE_SKU_MAX    = 24;
+constexpr size_t GOVEE_DEVICE_MAX = 32;
+constexpr size_t GOVEE_NAME_MAX   = 36;
+
+// Intervallo di aggiornamento dello stato mentre la pagina Govee e' visibile.
+constexpr unsigned long GOVEE_REFRESH_MS      = 15000UL;
+constexpr uint16_t      GOVEE_HTTP_TIMEOUT_MS = 8000;
 
 constexpr const char *NTP_SERVER = "pool.ntp.org";
 constexpr const char *TZ_INFO = "CET-1CEST,M3.5.0/2,M10.5.0/3";

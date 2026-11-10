@@ -244,6 +244,7 @@ void openSetupPortal() {
   }
 
   if (WiFi.status() == WL_CONNECTED) {
+    WiFi.setSleep(false);
     ensureSpotifyClient();
   }
 

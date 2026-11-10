@@ -514,6 +514,36 @@ void drawKeyGlyph(KeyGlyph glyph, int16_t x, int16_t y, uint16_t color) {
       tft.fillRect(x + 11, y + 2, 2, 9, color);
       break;
 
+    case GLYPH_POWER:
+      tft.drawFastVLine(x + 6, y + 1, 6, color);
+      tft.drawPixel(x + 3, y + 3, color);
+      tft.drawPixel(x + 2, y + 4, color);
+      tft.drawPixel(x + 9, y + 3, color);
+      tft.drawPixel(x + 10, y + 4, color);
+      tft.drawFastVLine(x + 1, y + 5, 5, color);
+      tft.drawFastVLine(x + 11, y + 5, 5, color);
+      tft.drawPixel(x + 2, y + 10, color);
+      tft.drawPixel(x + 3, y + 11, color);
+      tft.drawPixel(x + 10, y + 10, color);
+      tft.drawPixel(x + 9, y + 11, color);
+      tft.drawFastHLine(x + 4, y + 12, 5, color);
+      break;
+
+    case GLYPH_SUN:
+      tft.fillCircle(x + 6, y + 6, 3, color);
+      tft.drawFastVLine(x + 6, y, 2, color);
+      tft.drawFastVLine(x + 6, y + 11, 2, color);
+      tft.drawFastHLine(x, y + 6, 2, color);
+      tft.drawFastHLine(x + 11, y + 6, 2, color);
+      break;
+
+    case GLYPH_PALETTE:
+      tft.fillRect(x + 1, y + 2, 4, 4, color);
+      tft.fillRect(x + 7, y + 2, 4, 4, color);
+      tft.fillRect(x + 1, y + 8, 4, 4, color);
+      tft.drawRect(x + 7, y + 8, 4, 4, color);
+      break;
+
     case GLYPH_NONE:
     default:
       break;
@@ -597,7 +627,7 @@ void drawBootScreen(const char *statusLabel, const char *statusDetail,
 
   drawFrame(FRAME_X, BOOT_FRAME_Y, FRAME_W, BOOT_FRAME_H, COL_ACC_800);
 
-  drawLine("DESK CONSOLE", BOOT_TEXT_X, BOOT_TITLE_Y, 4, COL_INK);
+  drawLine("DESK THING", BOOT_TEXT_X, BOOT_TITLE_Y, 4, COL_INK);
   drawLine("ESP32 - ST7789 - v1.0", BOOT_TEXT_X,
            BOOT_TITLE_Y + textHeightPx(4) + 9, 1, COL_ACC_500);
 

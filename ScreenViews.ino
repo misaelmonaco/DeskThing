@@ -324,8 +324,8 @@ void drawWeatherCard(int16_t cardH) {
   // intero. "Ariano Irpino" sono tredici caratteri e a dimensione 2 ne
   // passano undici, quindi scende a 1: troncare il nome di un posto per
   // difendere un corpo di testo sarebbe il compromesso sbagliato.
-  const char *place = weather.place[0] != ' ' ? weather.place : weather.city;
-  if (place[0] == ' ') {
+  const char *place = weather.place[0] != '\0' ? weather.place : weather.city;
+  if (place[0] == '\0') {
     place = "nessuna citta'";
   }
 
@@ -407,7 +407,7 @@ void drawDhtPage() {
 
   if (!valid) {
     char note[40];
-    if (dhtState.lastValidClock[0] != ' ') {
+    if (dhtState.lastValidClock[0] != '\0') {
       snprintf(note, sizeof(note), "ultima lettura %s, %u tentativi falliti",
                dhtState.lastValidClock,
                static_cast<unsigned>(dhtState.failureCount));
@@ -568,7 +568,7 @@ void drawSpotifyPage() {
   // dal portale, che K3 apre al volo.
   if (spotifyState.appKeysMissing) {
     drawSpotifyEmptyState("CONFIGURA APP",
-                          "Premi K3 e collegati a SpotifyThing-Setup", COL_AMBER);
+                          "Premi K3 e collegati a Desk Thing", COL_AMBER);
 
     KeyBar setupBar = {{
       {"PAGINA",    GLYPH_PAGE, KEY_IDLE},
@@ -828,6 +828,152 @@ void drawPomodoroPage() {
 }
 
 // ---------------------------------------------------------------------------
+// PAGINA GOVEE LED STRIP - Layout A (Card Unica)
+// ---------------------------------------------------------------------------
+void drawGoveePage() {
+  bool online = networkOnline();
+
+  if (!govee.apiKeyPresent) {
+    drawPageStatusBar("GOVEE - DA CONFIGURARE", COL_AMBER);
+    drawFrame(FRAME_X, FRAME_Y, FRAME_W, FRAME_H, COL_ACC_800);
+    drawSpotifyEmptyState("API KEY MANCANTE",
+                          "Scrivi GOVEE_API_KEY in Secrets.h", COL_AMBER);
+    KeyBar emptyBar = {{
+      {"PAGINA",  GLYPH_PAGE,    KEY_IDLE},
+      {"-",       GLYPH_NONE,    KEY_DISABLED},
+      {"RIPROVA", GLYPH_REFRESH, KEY_PRIMARY},
+      {"-",       GLYPH_NONE,    KEY_DISABLED},
+    }};
+    drawKeyBar(emptyBar);
+    return;
+  }
+
+  if (!online) {
+    drawPageStatusBar("GOVEE - RETE ASSENTE", COL_AMBER);
+    drawFrame(FRAME_X, FRAME_Y, FRAME_W, FRAME_H, COL_ACC_800);
+    drawSpotifyEmptyState("NON COLLEGATO", "WiFi assente", COL_ACC_400);
+    KeyBar offBar = {{
+      {"PAGINA",  GLYPH_PAGE,    KEY_IDLE},
+      {"-",       GLYPH_NONE,    KEY_DISABLED},
+      {"RIPROVA", GLYPH_REFRESH, KEY_IDLE},
+      {"-",       GLYPH_NONE,    KEY_DISABLED},
+    }};
+    drawKeyBar(offBar);
+    return;
+  }
+
+  if (!govee.deviceFound) {
+    drawPageStatusBar("GOVEE - RICERCA", COL_AMBER);
+    drawFrame(FRAME_X, FRAME_Y, FRAME_W, FRAME_H, COL_ACC_800);
+    drawSpotifyEmptyState("CERCA STRISCIA", govee.statusMessage, COL_ACC_400);
+    KeyBar searchBar = {{
+      {"PAGINA", GLYPH_PAGE,   KEY_IDLE},
+      {"-",      GLYPH_NONE,   KEY_DISABLED},
+      {"CERCA",  GLYPH_SEARCH, KEY_PRIMARY},
+      {"-",      GLYPH_NONE,   KEY_DISABLED},
+    }};
+    drawKeyBar(searchBar);
+    return;
+  }
+
+  bool on = govee.powerOn;
+  drawPageStatusBar(on ? "GOVEE - ACCESA" : "GOVEE - IN STANDBY",
+                    on ? COL_ACC_600 : COL_AMBER);
+  drawFrame(FRAME_X, FRAME_Y, FRAME_W, FRAME_H, COL_ACC_800);
+
+  int16_t padX = FRAME_X + 14;
+
+  // Intestazione interna: nome dispositivo a sinistra, stato a destra.
+  drawFittedLine(govee.deviceName, padX, FRAME_Y + 12, 1, COL_ACC_500, 32);
+  const char *badge = !govee.online ? "OFFLINE" : (on ? "ONLINE" : "OFF");
+  uint16_t badgeCol = (!govee.online || !on) ? COL_AMBER : COL_ACC_400;
+  drawLine(badge, FRAME_X + FRAME_W - 14 - textWidthPx(1, textLen(badge)),
+           FRAME_Y + 12, 1, badgeCol);
+  tft.drawFastHLine(padX, FRAME_Y + 25, FRAME_W - 28, COL_ACC_800);
+
+  const GoveePreset &p = goveeGetPreset(govee.presetIndex);
+
+  if (on) {
+    // Zona superiore: riquadro swatch (54x54) a sinistra + dettagli colore a destra.
+    int16_t sx = padX;
+    int16_t sy = FRAME_Y + 36;
+    int16_t ssz = 54;
+    uint16_t swatchCol = rgb565(govee.r, govee.g, govee.b);
+
+    tft.fillRect(sx, sy, ssz, ssz, swatchCol);
+    tft.drawRect(sx, sy, ssz, ssz, COL_INK);
+    tft.drawRect(sx - 2, sy - 2, ssz + 4, ssz + 4, COL_ACC_800);
+
+    int16_t tx = sx + ssz + 14;
+    drawLine("COLORE ATTIVO", tx, sy + 2, 1, COL_ACC_600);
+
+    if (!govee.customColor) {
+      drawFittedLine(p.name, tx, sy + 16, 2, COL_INK, 16);
+      drawFittedLine(p.subtitle, tx, sy + 38, 1, COL_ACC_500, 32);
+    } else {
+      drawFittedLine("PERSONALIZZATO", tx, sy + 16, 2, COL_INK, 16);
+      char subBuf[32];
+      if (govee.kelvin > 0) {
+        snprintf(subBuf, sizeof(subBuf), "%u K - DA APP",
+                 static_cast<unsigned>(govee.kelvin));
+      } else {
+        snprintf(subBuf, sizeof(subBuf), "RGB %u, %u, %u",
+                 govee.r, govee.g, govee.b);
+      }
+      drawFittedLine(subBuf, tx, sy + 38, 1, COL_ACC_500, 32);
+    }
+
+    // Zona inferiore: etichetta luminosita' a sinistra, percentuale grande a
+    // destra (appena sopra la barra) e barra a 5 segmenti sotto.
+    int16_t barY = FRAME_Y + FRAME_H - 22;
+    int16_t briY = barY - textHeightPx(4) - 8;
+
+    char stepText[16];
+    snprintf(stepText, sizeof(stepText), "PASSO %u/5",
+             static_cast<unsigned>(govee.briStepIndex + 1));
+    drawLine("LUMINOSITA", padX, briY + 10, 1, COL_ACC_600);
+    drawLine(stepText, padX, briY + 22, 1, COL_ACC_500);
+
+    char briStr[8];
+    snprintf(briStr, sizeof(briStr), "%u", static_cast<unsigned>(govee.brightness));
+    int16_t bx = FRAME_X + FRAME_W - 14 - textWidthPx(4, textLen(briStr)) - textWidthPx(2, 1) - 2;
+    drawLine(briStr, bx, briY, 4, COL_ACC_300);
+    drawLine("%", bx + textWidthPx(4, textLen(briStr)) + 2,
+             briY + textHeightPx(4) - textHeightPx(2), 2, COL_ACC_500);
+
+    int16_t totalW = FRAME_W - 28;
+    int16_t segGap = 4;
+    int16_t segW = (totalW - segGap * 4) / 5;
+    for (int16_t i = 0; i < 5; ++i) {
+      int16_t sgx = padX + i * (segW + segGap);
+      uint16_t fillCol = (i <= static_cast<int16_t>(govee.briStepIndex)) ? swatchCol : COL_TRACK;
+      tft.fillRect(sgx, barY, segW, 8, fillCol);
+      tft.drawRect(sgx, barY, segW, 8, COL_ACC_800);
+    }
+  } else {
+    // Stato standby al centro della cornice.
+    int16_t cy = FRAME_Y + 62;
+    tft.fillRect(SCREEN_W / 2 - 16, cy, 32, 4, COL_ACC_700);
+    drawCenteredLine("LUCE SPENTA", cy + 16, 3, COL_ACC_500);
+
+    char lastNote[48];
+    snprintf(lastNote, sizeof(lastNote), "Ultimo preset: %s (%u%%)",
+             govee.customColor ? "PERSONALIZZATO" : p.name,
+             static_cast<unsigned>(govee.brightness));
+    drawCenteredFittedLine(lastNote, cy + 16 + textHeightPx(3) + 10, 1,
+                           COL_ACC_600, maxCharsForSize(1));
+  }
+
+  KeyBar bar = {{
+    {"PAGINA",              GLYPH_PAGE,    KEY_IDLE},
+    {on ? "SPEGNI" : "ACCENDI", GLYPH_POWER, on ? KEY_ACTIVE : KEY_PRIMARY},
+    {"LUMIN.",              GLYPH_SUN,     on ? KEY_IDLE : KEY_DISABLED},
+    {"COLORE",              GLYPH_PALETTE, on ? KEY_IDLE : KEY_DISABLED},
+  }};
+  drawKeyBar(bar);
+}
+
+// ---------------------------------------------------------------------------
 // REGISTRO DELLE SCHERMATE
 // ---------------------------------------------------------------------------
 // Il footer non sta piu' qui: le etichette dei tasti cambiano con lo stato
@@ -837,6 +983,7 @@ const ScreenView screenViews[PAGE_COUNT] = {
   {"DHT22",    drawDhtPage,      handleDhtButtonPress},
   {"SPOTIFY",  drawSpotifyPage,  handleSpotifyButtonPress},
   {"POMODORO", drawPomodoroPage, handlePomodoroButtonPress},
+  {"GOVEE",    drawGoveePage,    handleGoveeButtonPress},
 };
 
 const ScreenView &currentScreenView() {

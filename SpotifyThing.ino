@@ -59,6 +59,7 @@
 #else
 constexpr const char *SPOTIFY_CLIENT_ID = "";
 constexpr const char *SPOTIFY_CLIENT_SECRET = "";
+constexpr const char *GOVEE_API_KEY = "";
 #endif
 
 // ---------------------------------------------------------------------------
@@ -110,6 +111,7 @@ enum Page {
   PAGE_DHT,
   PAGE_SPOTIFY,
   PAGE_POMODORO,
+  PAGE_GOVEE,
   PAGE_COUNT
 };
 
@@ -267,6 +269,38 @@ struct PomodoroState {
   uint16_t completedWorkSessions;
 };
 
+// Preset colore/temperatura per la striscia Govee.
+struct GoveePreset {
+  const char *name;
+  const char *subtitle;
+  uint8_t r;
+  uint8_t g;
+  uint8_t b;
+  uint16_t kelvin;  // > 0 per temperatura bianco in Kelvin, 0 per RGB puro
+};
+
+// Stato runtime della striscia LED Govee (OpenAPI v2).
+struct GoveeState {
+  bool apiKeyPresent;
+  bool deviceFound;
+  bool online;
+  bool powerOn;
+  uint8_t brightness;     // 1..100
+  uint8_t briStepIndex;   // 0..4 (20%, 40%, 60%, 80%, 100%)
+  uint8_t presetIndex;    // indice nel vettore dei preset
+  bool customColor;       // true se il colore attivo non e' fra i preset fissi
+  uint8_t r;
+  uint8_t g;
+  uint8_t b;
+  uint16_t kelvin;
+  int lastStatusCode;
+  unsigned long lastPollMs;
+  char sku[GOVEE_SKU_MAX];
+  char device[GOVEE_DEVICE_MAX];
+  char deviceName[GOVEE_NAME_MAX];
+  char statusMessage[TEXT_STATUS_MAX];
+};
+
 Button buttons[] = {
   {BTN_K1, "K1", false, 0, 0, 0, 0, 0, 0, 0},
   {BTN_K2, "K2", false, 0, 0, 0, 0, 0, 0, 0},
@@ -293,6 +327,11 @@ PomodoroState pomodoroState = {false, false, POMODORO_WORK_MS, 0, POMODORO_WORK_
 AlbumArtState albumArt = {"", nullptr, 0, 0, false, false};
 WeatherState weather = {"", "", 0.0f, 0.0f, false,
                         NAN, 0, -1, false, 0, 0, "", "nessuna citta' scelta"};
+GoveeState govee = {false, false, true, false,
+                    80, 3, 0, false,
+                    255, 184, 108, 2700,
+                    0, 0,
+                    "", "", "STRISCIA SCRIVANIA", "In attesa"};
 
 // displayDirty governa il solo ridisegno completo della pagina, che serve
 // quando cambia la schermata o un elemento statico. I valori che scorrono
@@ -380,6 +419,7 @@ void handleClockButtonPress(size_t index);
 void handleDhtButtonPress(size_t index);
 void handleSpotifyButtonPress(size_t index);
 void handlePomodoroButtonPress(size_t index);
+void handleGoveeButtonPress(size_t index);
 
 // ---------------------------------------------------------------------------
 // DICHIARAZIONI - AlbumArt.ino
@@ -411,6 +451,20 @@ bool weatherIsStale();
 const char *weatherConditionName(int16_t code);
 
 // ---------------------------------------------------------------------------
+// DICHIARAZIONI - Govee.ino
+// ---------------------------------------------------------------------------
+void initGovee();
+bool goveeDiscoverDevice();
+bool goveeFetchState();
+bool goveeSetPower(bool on);
+bool goveeStepBrightness();
+bool goveeNextPreset();
+void refreshGoveeData();
+void printGoveeStatus();
+uint8_t goveePresetCount();
+const GoveePreset &goveeGetPreset(uint8_t index);
+
+// ---------------------------------------------------------------------------
 // DICHIARAZIONI - Console.ino
 // ---------------------------------------------------------------------------
 void pollSerialConsole();
@@ -430,6 +484,7 @@ void drawClockPage();
 void drawDhtPage();
 void drawSpotifyPage();
 void drawPomodoroPage();
+void drawGoveePage();
 
 // ---------------------------------------------------------------------------
 // DICHIARAZIONI - SpotifyLink.ino
@@ -487,6 +542,7 @@ void initializeApplication() {
   // rilegge anche il portale quando precompila il campo, ed e' un'operazione
   // senza effetti collaterali: farla due volte non costa niente.
   loadWeatherSettings();
+  initGovee();
 
   // Va interrogato prima dei servizi: decide se connectToWifi() debba
   // riaprire il portale invece di riusare la rete salvata.
@@ -496,11 +552,12 @@ void initializeApplication() {
 
   Serial.println("Sistema avviato");
   Serial.printf("Display ST7789 attivo: %d x %d\n", tft.width(), tft.height());
-  Serial.println("Pagine: Clock -> DHT22 -> Spotify -> Pomodoro");
+  Serial.println("Pagine: Clock -> DHT22 -> Spotify -> Pomodoro -> Govee");
   Serial.println("Nell'orologio: K2 risincronizza NTP, K3 riconnette, K4 dimentica rete");
   Serial.println("Nel player: K2 precedente, K3 play/pausa, K4 successiva");
   Serial.println("Nel player: K4 tenuto premuto scollega l'account Spotify");
   Serial.println("Nel Pomodoro: K3 avvia timer, K4 reset");
+  Serial.println("In Govee: K2 accende/spegne, K3 luminosita', K4 colore");
   Serial.println("Navigazione pagine: K1 avanza, K1 tenuto premuto torna all'orologio");
   Serial.println("All'accensione: K4 tenuto premuto 3s cancella la rete WiFi salvata");
 

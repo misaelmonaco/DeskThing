@@ -31,6 +31,9 @@ static void consoleHelp() {
   Serial.println("  meteo          stato del meteo");
   Serial.println("  meteo <citta>  imposta la citta' (es: meteo Ariano Irpino)");
   Serial.println("  aggiorna       forza subito un'interrogazione del meteo");
+  Serial.println("  govee          stato della striscia Govee");
+  Serial.println("  govee cerca    riscopre i dispositivi Govee dall'API");
+  Serial.println("  govee on/off   accende o spegne la striscia Govee");
 }
 
 // Toglie spazi e tabulazioni in testa e in coda, in posto.
@@ -86,6 +89,28 @@ static void consoleExecute(char *raw) {
     Serial.printf("[meteo] citta' impostata dal seriale: %s\n", weather.city);
     Serial.println("[meteo] la geocodifica parte al prossimo giro");
     return;
+  }
+
+  if (strncasecmp(line, "govee", 5) == 0) {
+    char *arg = consoleTrim(line + 5);
+    if (arg[0] == '\0') {
+      printGoveeStatus();
+      return;
+    }
+    if (strcasecmp(arg, "cerca") == 0) {
+      goveeDiscoverDevice();
+      govee.lastPollMs = 0;
+      markDisplayDirty();
+      return;
+    }
+    if (strcasecmp(arg, "on") == 0) {
+      goveeSetPower(true);
+      return;
+    }
+    if (strcasecmp(arg, "off") == 0) {
+      goveeSetPower(false);
+      return;
+    }
   }
 
   Serial.printf("comando sconosciuto: \"%s\"   (? per l'elenco)\n", line);

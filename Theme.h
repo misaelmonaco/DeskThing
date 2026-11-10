@@ -171,7 +171,10 @@ enum KeyGlyph : uint8_t {
   GLYPH_PAUSE,      // due barre verticali
   GLYPH_SEARCH,     // lente
   GLYPH_RESET,      // freccia indietro
-  GLYPH_SKIP        // doppio triangolo
+  GLYPH_SKIP,       // doppio triangolo
+  GLYPH_POWER,      // tasto di accensione (anello con stanghetta)
+  GLYPH_SUN,        // sole a quattro raggi: luminosita'
+  GLYPH_PALETTE     // quattro quadratini: selezione colore
 };
 
 struct KeyCell {
